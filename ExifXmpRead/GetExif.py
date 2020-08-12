@@ -1,111 +1,96 @@
+# Version 2.0.2 | Updated 12.08.2020
+
+# Return exif as xml or json. A lot of DRY 13.06.2020. Reads exif with piexif, 
+# decodes, and cleans the data and converts it to more userfriendly datatypes and format."""
+
 import piexif
 import json
+from ExifXmpRead.GPSConverter import convert_to_decimal_degrees, convert_to_meters_above_sealevel
 
-class ExifFromPicture:
-    """ Returns a JSON with exif metadata from picture. Enables to acquire specific exif data, 
-    ex. date, latitude, longitude, etc.
-    Returns "None" if the picture does not contain exif. """
+problematic_exif = ["FileSource", "SceneType", "MakerNote", "XPComment", "UserComment", "ComponentsConfiguration", "XPKeywords"]  #NOTE: Cheap solution. A general solution would be better.
 
-    def __init__(self, path_picture):
-        self.path_picture = path_picture
-        self.exif_data = self._get_exif_all()
 
-    def _get_exif_all(self):
-        """ Return exif data as dict. Read everything. """
-        try:
-            exif_dict = piexif.load(self.path_picture)
-            exif_data = dict()
-            for ifd in ("0th", "Exif", "GPS", "1st"):   # ifd = image file directory
-                for tag in exif_dict[ifd]:
-                    exif_data[piexif.TAGS[ifd][tag]["name"]] = exif_dict[ifd][tag]
-            return exif_data
-        except:
-            print(f'Exif Error. Unable to read Exif data from {self.path_picture}')
+def _get_exif_raw(path_image):
+    """ Return raw exif data as dict. Piexif is used. """
+    try:
+        exif_dict = piexif.load(path_image)
+        exif_data = dict()
+        for ifd in ("0th", "Exif", "GPS", "1st"):   # ifd = image file directory
+            for tag in exif_dict[ifd]:
+                exif_data[piexif.TAGS[ifd][tag]["name"]] = exif_dict[ifd][tag]
+        return exif_data
+    except:
+        print(f'Exif Error. Unable to read Exif data from {path_image}')
 
-    def __convert_to_degrees(self, value):
-        """Return decimal degrees as float. Helper function to convert the GPS coordinates stored in the EXIF.
-        Parameter: 'GPSLongitude': ((6, 1), (8, 1), (409675, 10000))
-                    where degrees = 6/1, minutes =  8/1, seconds = 409675/10000 """
-        degrees = float(value[0][0]) / float(value[0][1]) 
-        minutes = float(value[1][0]) / float(value[1][1]) 
-        seconds = float(value[2][0]) / float(value[2][1])
-        decimal_degrees =  degrees + (minutes / 60.0) + (seconds / 3600.0)
-        return decimal_degrees
 
-    def _GetTimeOriginal(self):
-        """ Return Time Original as string."""
-        time_original = self.exif_data['DateTimeOriginal'].decode('utf-8').split(' ')[1]
-        return time_original
+def get_exif_json(path_image):
+    """ Return exif as JSON. The elements are decoded from binary to str and GPS converted."""
+    
+    element = dict()
+    for key, value in _get_exif_raw(path_image).items():
+        
+        if  key in ["GPSLatitude","GPSLongitude"]:
+            decimal_degrees = convert_to_decimal_degrees(value)
+            element[f'{key}_decimal_degrees'] = decimal_degrees
+            continue
+        if key == "GPSAltitude":               
+            element[key] = convert_to_meters_above_sealevel(value)
+            continue
+        if key in problematic_exif:
+            element[key] = "Removed by script GetExif."
+            continue 
+        if type(value) == bytes:
+            element[key] = value.decode('utf-8').strip('\x00') #BUG: Fixed 13.06.2020! Confused space with char null. Tried to strip(' ')
+        else:
+            element[key] = value
 
-    def _GetDateOriginal(self):
-        """ Return date as string. The date represents when the picture was captured. """
-        date_original = self.exif_data['DateTimeOriginal'].decode('utf-8').split(' ')[0]
-        return date_original
+    return json.dumps(element, indent=4)
 
-    def _GetLongitude(self):
-        """ Return longitude as tuple. Decimal degrees = float. East = 'E'.
-        >>> instance._GetLongitude()
-        (5.6856583333333335, 'E', 'Decimal Degrees')
-        """
-        raw_longitude = self.exif_data["GPSLongitude"]
-        ref_longitude = self.exif_data["GPSLongitudeRef"].decode('utf-8') 
-        longitude = self.__convert_to_degrees(raw_longitude)
-        return longitude, ref_longitude, str("Decimal Degrees")
 
-    def _GetLatitude(self):
-        """ Return latitude as tuple. Decimal degrees = Float. North = 'N'.
-        >>> instance._GetLatitude()
-        (60.96168333333333, 'N',  'Decimal Degrees')
-        """
-        raw_latitude = self.exif_data["GPSLatitude"]
-        ref_latitude = self.exif_data["GPSLatitudeRef"].decode('utf-8')  
-        latitude = self.__convert_to_degrees(raw_latitude)
-        return latitude, ref_latitude, str("Decimal Degrees")
+def get_exif_xml(path_image):
+    """ Return exif data on xml format. Contains all the exif data from _get_exif_all(). 
+    Contain a lot of DRY - To be improved 13.06.2020
+    param: None
+    rtype: xml as string """
+    
+    elements = str()
+    for key, value in _get_exif_raw(path_image).items():
 
-    def _GetAltitude(self):
-        """ Return altitude in meters above sealevel.
-        rtype: str """
-        try:
-            altitude = self.exif_data['GPSAltitude'][0]/exif_data['GPSAltitude'][1]
-        except:
-            altitude = "None"
-        return altitude, str('meters Above Sea Level')
+        if key in ["GPSLatitude","GPSLongitude"]:
+            coord = convert_to_decimal_degrees(value)
+            element = f'<exif:{key}_decimal_degrees>{coord}</exif:{key}_decimal_degrees>\n'
+            elements = elements + element
+            continue
+        if key == "GPSAltitude":               
+            alt = convert_to_meters_above_sealevel(value) 
+            element = f'<exif:{key}_meters>{alt}</exif:{key}_meters>\n'
+            elements = elements + element
+            continue
+        if key in problematic_exif:
+            element = f'<exif:{key}>{"Removed by GetExif"}</exif:{key}>\n'
+            elements = elements + element
+            continue 
+        if type(value) == bytes:
+            try:
+                decoded_value = value.decode('utf-8').strip('\x00')
+                element = f'<exif:{key}>{decoded_value}</exif:{key}>\n'
+                elements = elements + element
+            except:
+                element = f'<exif:{key}>{"Unable to decode with utf-8"}</exif:{key}>\n'
+                elements = elements + element
+        else:
+            element = f'<exif:{key}>{value}</exif:{key}>\n '
+            elements = elements + element
 
-    def _GetMake(self):
-        """ Return Make as a string. This has something to do with the camera type."""
-        make = self.exif_data["Make"].decode('utf-8') # Decoding from binary to string
-        return make
+    return elements
 
-    def _GetModel(self):
-        """ Retrun Model as a string. This is the camera model."""
-        model = self.exif_data["Model"].decode('utf-8') # Decoding from binary to string
-        model = "None"
-        return model
+def get_google_maps_link(path_image):
+    """ Return gmaps link as string. """
+    json_str = get_exif_json(path_image)
+    json_obj = json.loads(json_str)
 
-    def _GetOrientation(self):
-        """ Return orientation as an integer. Orientation describes how the picture is rotated."""
-        orientation = self.exif_data["Orientation"]
-        return orientation
+    lat = json_obj["GPSLatitude_decimal_degrees"]
+    lon = json_obj["GPSLongitude_decimal_degrees"]
 
-    def _GetMapsGoogleLink(self):
-        """ Return gmaps link as string. """
-        maps_google_link = f'https://www.google.com/maps?q={self._GetLatitude()[0]}N,{self._GetLongitude()[0]}E'
-        return maps_google_link
-
-    def GetExifJson(self):
-        """ Return JSON as string. Contains only some of the most used exif data. """
-        try:
-            neat_json = {
-                        "Make" : self._GetMake(),
-                        "Model" : self._GetModel(),
-                        "DateOriginal" : self._GetDateOriginal(),
-                        "TimeOriginal" : self._GetTimeOriginal(),
-                        "GPSLatitude" : self._GetLatitude(),
-                        "GPSLongitude" : self._GetLongitude(),
-                        "GPSAltitude" : self._GetAltitude(),
-                        "Orientation" : self._GetOrientation(),
-                        "MapsGoogleLink | NOTE: NOT Exif" : self._GetMapsGoogleLink(), #NOTE: Not Exif data, but useful
-                        }
-            return json.dumps(neat_json)
-        except:
-            print(f'Exif Error. Hoy! You better understand why. File: {self.path_picture}')
+    google_maps_link = f'https://www.google.com/maps?q={lat}N,{lon}E'
+    return google_maps_link

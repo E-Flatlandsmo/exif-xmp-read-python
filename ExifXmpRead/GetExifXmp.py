@@ -1,37 +1,29 @@
 import json
-from ExifXmpRead.GetXmp import XmpFromPicture
-from ExifXmpRead.GetExif import ExifFromPicture
+from ExifXmpRead.getExif import get_exif_json, get_exif_xml
+from ExifXmpRead.getXmp import get_xmp_json, get_xmp_xml
 
-class ExifXmpFromPicture:
-    """ Class for extracting both Exif and Xmp metdata from pictures and merging the data.
-    27.03.2020: Supports only JSON. """
+#    Extracts exif and xmp metdata from Images and merging it into a JSON.
+#    12.08.2020: Supports only merging of JSONs, not XML.
+
+def get_exif_xmp_json(path_image):
+    """ Return JSON as string, one Image at a time. 
+    Combines exif data and xmp data by merging GetExifJson() and GetXmpJson().
+    Error handling: Return None if xmp or exif does not exist. Translated to null in json.dumps(obj) """
+
+    try:
+        exif_json = json.loads(get_exif_json(path_image))
+    except: 
+        exif_json = None
+
+    try:
+        xmp_json = json.loads(get_xmp_json(path_image))
+    except: 
+        xmp_json = None
     
-    def __init__(self, path_picture):
-        self.path_picture = path_picture
+    exif_xmp_dict = {
+                "Filename": path_image.split('\\')[-1],
+                "Exif": exif_json,
+                "Xmp": xmp_json, 
+                }
 
-    def GetExifXmpJson(self):
-        """ Return JSON as string, one picture at a time. 
-        Combines exif data and xmp data by merging GetExifJson() and GetXmpJson().
-        Error handling: Return None if xmp or exif does not exist. Translated to null in json.dumps(obj) """
-        
-        exif_instance = ExifFromPicture(self.path_picture)
-        get_exif = exif_instance.GetExifJson()
-        try:
-            exif_json = json.loads(get_exif)
-        except: 
-            exif_json = None
-
-        xmp_instance = XmpFromPicture(self.path_picture)
-        get_xmp = xmp_instance.GetXmpJson(raw=True) #NOTE: How to handle this in GetExifXMP?
-        try:
-            xmp_json = json.loads(get_xmp)
-        except: 
-            xmp_json = None
-        
-        exif_xmp_dict = {
-                    "Filename": self.path_picture.split('\\')[-1],
-                    "Exif": exif_json,
-                    "Xmp": xmp_json, 
-                    }
-        return json.dumps(exif_xmp_dict, indent=4) 
-        
+    return json.dumps(exif_xmp_dict, indent=4) 

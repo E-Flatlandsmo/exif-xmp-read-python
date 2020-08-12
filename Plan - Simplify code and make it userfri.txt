@@ -1,0 +1,21 @@
+Plan - Simplify code and make it userfriendly
+
+1. Make it work with as-is.
+    - CHECK! Test GetExif. 
+    - CHECK! Test GetXmp
+    - CHECK! Test GetExifXmp
+    - CHECK! Test GPSConverter
+
+2. Remove classes, fuctionfy it!
+    - CHECK! GetExif. 
+    - CHECK! GetXmp
+    - CHECK! GetExifXmp
+
+
+3.  - Test CSVConverter
+    - Update Examplecode
+    - Update Readme
+
+When working with the scripts, clean it. 
+- CHEKC! Dirname: Capital letters, modules camelcase, definitions small letters joined by underscore
+
