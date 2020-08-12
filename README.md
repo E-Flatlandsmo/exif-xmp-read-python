@@ -1,14 +1,11 @@
 Dependencies:
     - pip install piexif
 
-
 What does this library do?
-It allows you to extract exif and xmp information from .jpg, .JPEG pictures. Does not work in .HEIC format. 
+It allows you to extract exif and xmp information from .jpg, .JPEG pictures. Does not support .HEIC format and probabely other formats.
 
-How to use?
- - Extract exif from one image: get_exif(path_to_picture)
- - Extract exif from dir: getExif(path_to_dir)? Should i do this? How?
- - Extract xmp from one image: get_xmp() 
+Why?
+Could be used for many different purposes. One can use metadata to automatise handling of images, like sorting, storage. Applications can make use the coordinates to map the pictures to a map. The story goes on..
 
-
-For concrete examples, See ExampleCode.py in root directory.
+How? 
+See sampleCode.py
