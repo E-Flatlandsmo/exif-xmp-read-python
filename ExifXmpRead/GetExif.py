@@ -37,7 +37,7 @@ def get_exif_json(path_image):
             element[key] = convert_to_meters_above_sealevel(value)
             continue
         if key in problematic_exif:
-            element[key] = "Removed by script GetExif."
+            element[key] = "Removed by script getExif."
             continue 
         if type(value) == bytes:
             element[key] = value.decode('utf-8').strip('\x00') #BUG: Fixed 13.06.2020! Confused space with char null. Tried to strip(' ')
@@ -67,7 +67,7 @@ def get_exif_xml(path_image):
             elements = elements + element
             continue
         if key in problematic_exif:
-            element = f'<exif:{key}>{"Removed by GetExif"}</exif:{key}>\n'
+            element = f'<exif:{key}>{"Removed by getExif"}</exif:{key}>\n'
             elements = elements + element
             continue 
         if type(value) == bytes:
